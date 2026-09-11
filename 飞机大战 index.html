@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>NEON STRIKE — 霓虹突袭</title>
+<link rel="stylesheet" href="css/style.css?v=2" />
+</head>
+<body>
+  <div id="wrap">
+    <canvas id="game" width="480" height="720"></canvas>
+    <div id="hint">点击 / 按 任一键 开始</div>
+  </div>
+
+  <!-- 按依赖顺序加载：经典 script 标签（支持 file:// 双击即玩），?v=2 用于刷新缓存 -->
+  <script src="js/config.js?v=2"></script>
+  <script src="js/engine/events.js?v=2"></script>
+  <script src="js/engine/pool.js?v=2"></script>
+  <script src="js/engine/storage.js?v=2"></script>
+  <script src="js/engine/input.js?v=2"></script>
+  <script src="js/engine/audio.js?v=2"></script>
+  <script src="js/engine/renderer.js?v=2"></script>
+  <script src="js/engine/asset.js?v=2"></script>
+  <script src="js/data/weapons.js?v=2"></script>
+  <script src="js/data/passives.js?v=2"></script>
+  <script src="js/data/enemies.js?v=2"></script>
+  <script src="js/data/bosses.js?v=2"></script>
+  <script src="js/data/waves.js?v=2"></script>
+  <script src="js/data/upgrades.js?v=2"></script>
+  <script src="js/systems/difficulty.js?v=2"></script>
+  <script src="js/systems/collision.js?v=2"></script>
+  <script src="js/systems/bulletPattern.js?v=2"></script>
+  <script src="js/systems/dropper.js?v=2"></script>
+  <script src="js/systems/spawner.js?v=2"></script>
+  <script src="js/entities/Particle.js?v=2"></script>
+  <script src="js/entities/Bullet.js?v=2"></script>
+  <script src="js/entities/Gem.js?v=2"></script>
+  <script src="js/entities/Pickup.js?v=2"></script>
+  <script src="js/entities/Enemy.js?v=2"></script>
+  <script src="js/entities/Boss.js?v=2"></script>
+  <script src="js/entities/Player.js?v=2"></script>
+  <script src="js/ui/Scene.js?v=2"></script>
+  <script src="js/ui/MainMenu.js?v=2"></script>
+  <script src="js/ui/Hud.js?v=2"></script>
+  <script src="js/ui/UpgradePanel.js?v=2"></script>
+  <script src="js/ui/PauseMenu.js?v=2"></script>
+  <script src="js/ui/GameOver.js?v=2"></script>
+  <script src="js/engine/Game.js?v=2"></script>
+  <script src="js/main.js?v=2"></script>
+</body>
+</html>
