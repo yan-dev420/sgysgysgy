@@ -1,0 +1,1724 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>粒子星球 · 手势星际遨游</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        #input-video { display: none; }
+
+        /* UI 提示层 */
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            color: rgba(255, 255, 255, 0.85);
+            pointer-events: none;
+            user-select: none;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 12px rgba(120, 200, 255, 0.9);
+        }
+
+        .instruction {
+            margin-top: 10px;
+            font-size: 0.85rem;
+            line-height: 1.75;
+            background: rgba(6, 12, 24, 0.55);
+            backdrop-filter: blur(6px);
+            padding: 12px 14px;
+            border-radius: 10px;
+            border-left: 3px solid #66ccff;
+            max-width: 260px;
+        }
+
+        .status {
+            margin-top: 8px;
+            font-weight: bold;
+            color: #00ffcc;
+            text-shadow: 0 0 8px rgba(0, 255, 204, 0.6);
+        }
+
+        /* 声音开关 */
+        #btn-sound {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 12;
+            width: 44px;
+            height: 44px;
+            font-size: 20px;
+            color: #fff;
+            background: rgba(10, 20, 40, 0.6);
+            border: 1px solid rgba(120, 200, 255, 0.4);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        #btn-sound:hover { background: rgba(40, 80, 140, 0.8); }
+        #btn-sound.muted { opacity: 0.45; }
+
+        #btn-music {
+            position: absolute;
+            top: 74px;
+            right: 20px;
+            z-index: 12;
+            width: 44px;
+            height: 44px;
+            font-size: 20px;
+            color: #fff;
+            background: rgba(10, 20, 40, 0.6);
+            border: 1px solid rgba(120, 200, 255, 0.4);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        #btn-music:hover { background: rgba(40, 80, 140, 0.8); }
+
+        /* 轻提示 */
+        #toast {
+            position: absolute;
+            bottom: 28px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 15;
+            background: rgba(10, 22, 44, 0.85);
+            border: 1px solid rgba(120, 200, 255, 0.4);
+            color: #cfe8ff;
+            padding: 10px 24px;
+            border-radius: 999px;
+            font-size: 0.9rem;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            user-select: none;
+        }
+        #toast.show { opacity: 1; }
+
+        /* 摄像头预览小窗 */
+        #webcam-preview {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 160px;
+            height: 120px;
+            z-index: 10;
+            border: 1px solid rgba(120, 200, 255, 0.35);
+            border-radius: 8px;
+            opacity: 0.75;
+            transform: scaleX(-1); /* 镜像翻转 */
+            box-shadow: 0 0 18px rgba(60, 140, 255, 0.25);
+        }
+
+        /* 启动遮罩 */
+        #start-overlay {
+            position: absolute;
+            inset: 0;
+            z-index: 30;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(ellipse at center, rgba(8, 14, 34, 0.82), rgba(0, 0, 5, 0.94));
+        }
+        .start-card {
+            text-align: center;
+            color: #cfe8ff;
+            padding: 40px 60px;
+            border: 1px solid rgba(120, 200, 255, 0.25);
+            border-radius: 16px;
+            background: rgba(8, 16, 36, 0.6);
+            backdrop-filter: blur(8px);
+            box-shadow: 0 0 60px rgba(60, 140, 255, 0.15);
+        }
+        .start-card h2 { margin: 0 0 10px; letter-spacing: 3px; font-weight: 500; }
+        .start-card p { margin: 6px 0; opacity: 0.75; font-size: 0.9rem; }
+        #btn-start {
+            margin-top: 22px;
+            padding: 14px 42px;
+            font-size: 1.05rem;
+            letter-spacing: 2px;
+            color: #fff;
+            background: linear-gradient(135deg, #1a4a8a, #0a6a8a);
+            border: 1px solid rgba(150, 220, 255, 0.5);
+            border-radius: 999px;
+            cursor: pointer;
+            transition: all 0.25s;
+        }
+        #btn-start:hover { box-shadow: 0 0 30px rgba(100, 200, 255, 0.5); transform: scale(1.04); }
+        #loading { display: none; margin-top: 16px; font-size: 0.85rem; opacity: 0.8; }
+    </style>
+
+    <!-- MediaPipe 改为点击启动后动态加载（国内镜像源优先，失败自动回退国际源） -->
+
+    <!-- 2. Three.js Import Map for Modules -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://registry.npmmirror.com/three/0.160.0/files/build/three.module.js",
+                "three/addons/": "https://registry.npmmirror.com/three/0.160.0/files/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <!-- 启动遮罩（浏览器要求用户交互后才能播放音频） -->
+    <div id="start-overlay">
+        <div class="start-card">
+            <h2>🌌 粒子星球 · 手势星际遨游</h2>
+            <p>开启摄像头与声音，用双手在宇宙中冲浪</p>
+            <p>建议佩戴耳机 · 体验更佳</p>
+            <button id="btn-start">🚀 开启星际之旅</button>
+            <div id="loading">正在启动神经连接...<br><span style="font-size:12px">请允许摄像头权限</span></div>
+            <p id="cam-denied-tip" style="display:none;margin:8px 0 0;color:#ff9d7a;font-size:0.8rem">⚠️ 已检测到摄像头权限被拒绝<br>请点地址栏左侧锁图标 → 网站设置 → 摄像头=允许，然后刷新</p>
+            <p id="skip-entry" style="margin-top:14px;font-size:0.8rem;opacity:0.55;cursor:pointer;text-decoration:underline">跳过手势，仅观赏场景与音乐 →</p>
+        </div>
+    </div>
+
+    <div id="ui-layer">
+        <h1>粒子星云核心</h1>
+        <div class="instruction">
+            ✊ <b>握拳</b> —— 视角拉远<br>
+            ✋ <b>张开</b> —— 靠近星球<br>
+            🖐 <b>倾斜手掌</b> —— 环绕旋转<br>
+            ✌️ <b>剪刀手</b> —— 超新星爆发<br>
+            👍 <b>点赞</b> —— 切换星云配色<br>
+            🤏 <b>捏合</b> —— 引力奇点<br>
+            ☝️ <b>单指指向</b> —— 召唤流星<br>
+            🙌 <b>双手开合</b> —— 膨胀 / 收缩宇宙
+        </div>
+        <div id="gesture-status" class="status">等待启动...</div>
+    </div>
+
+    <button id="btn-sound" title="声音开关">🔊</button>
+    <button id="btn-music" title="切换 BGM 风格">🎵</button>
+    <div id="toast"></div>
+
+    <!-- 隐藏的原始视频输入 -->
+    <video id="input-video"></video>
+    <!-- 用于反馈的小画布 -->
+    <canvas id="webcam-preview"></canvas>
+    <!-- 主3D场景 -->
+    <div id="canvas-container"></div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+        // ==========================================
+        // 0. 全局配置与状态
+        // ==========================================
+        const CONFIG = {
+            particleCount: 9000,
+            ringParticleCount: 5000,
+            minDistance: 120,
+            defaultDistance: 300,
+            rotationSpeed: 2.6,          // 手势环绕速度（弧度/秒，帧率无关）
+            rotationDeadzone: 0.12,      // 死区，过滤手部抖动
+            cruiseSpeed: 0.07            // 自动巡航（弧度/秒）
+        };
+
+        let scene, camera, renderer, composer, bloomPass;
+        let planetGroup, planetSystem, ringSystem1, ringSystem2, starfield;
+        let planetMat, ringMat1, ringMat2, starMat;
+        const nebulaSprites = [];
+        const comets = [];
+        const bursts = [];
+
+        const clock = new THREE.Clock();
+        let energy = 0;        // 全局能量脉冲 (超新星等触发)
+        let fovBoost = 0;      // 曲率飞行 FOV 冲击
+        let expansion = 0;     // 双手膨胀系数 0~1
+        let expansionTarget = 0;
+        let gravityStrength = 0, gravityTarget = 0;
+        const attractor = new THREE.Vector3(0, 0, 0);
+        const attractorTarget = new THREE.Vector3(0, 0, 0);
+        let nextAmbientComet = 3;
+
+        const cameraState = {
+            radius: CONFIG.defaultDistance,
+            theta: Math.PI / 2,
+            phi: 0,
+            zoomVelocity: 0,
+            isFist: false,
+            isOpen: false,
+            handRotation: 0,          // 平滑后的旋转量（渲染循环插值）
+            handRotationTarget: 0     // 手势识别给出的目标旋转量（~30fps 更新）
+        };
+
+        const statusEl = document.getElementById('gesture-status');
+        const loadingEl = document.getElementById('loading');
+
+        let toastTimer = null;
+        function showToast(msg, ms = 2200) {
+            const el = document.getElementById('toast');
+            el.textContent = msg;
+            el.classList.add('show');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => el.classList.remove('show'), ms);
+        }
+
+        // ==========================================
+        // 1. 音频引擎 (Web Audio 全合成，无需外部音频文件)
+        //    BGM: 星际穿越风格 —— 管风琴式 Pad + 八分音符琶音 + 低音持续音
+        // ==========================================
+        // --- BGM 风格库（🎵 按钮循环切换） ---
+        const CHORDS_MIN = [
+            { root: 110.00, notes: [110.00, 164.81, 220.00, 261.63, 329.63] },  // Am
+            { root:  87.31, notes: [ 87.31, 130.81, 174.61, 220.00, 261.63] },  // F
+            { root: 130.81, notes: [130.81, 196.00, 261.63, 329.63, 392.00] },  // C
+            { root:  98.00, notes: [ 98.00, 146.83, 196.00, 246.94, 293.66] }   // G
+        ];
+        const CHORDS_BRIGHT = [CHORDS_MIN[2], CHORDS_MIN[3], CHORDS_MIN[0], CHORDS_MIN[1]]; // C-G-Am-F，更明亮
+
+        const BGM_STYLES = [
+            { name: '星际管风琴', bpm: 72, chordBeats: 8,  arp: true,  arpWave: 'triangle', arpGain: 0.13, padWave: 'sawtooth', padGain: 0.14, filterBase: 750,  chords: CHORDS_MIN },
+            { name: '深空氛围',   bpm: 56, chordBeats: 16, arp: false, arpWave: 'sine',     arpGain: 0.10, padWave: 'sawtooth', padGain: 0.13, filterBase: 560,  chords: CHORDS_MIN },
+            { name: '钢琴星海',   bpm: 88, chordBeats: 8,  arp: true,  arpWave: 'sine',     arpGain: 0.16, padWave: 'triangle', padGain: 0.09, filterBase: 980,  chords: CHORDS_BRIGHT }
+        ];
+
+        const AudioEngine = {
+            ctx: null, master: null, bgmGain: null, sfxGain: null,
+            padFilter: null, noiseBuf: null,
+            chordQueue: [], chordIdx: 0, nextChordTime: 0, nextArpTime: 0,
+            arpStep: 0, panFlip: 1, timer: null, styleIdx: 0,
+            droneOscs: null, droneGain: null, droneFilter: null,
+            enabled: true,
+            lastSfx: {},
+
+            style() { return BGM_STYLES[this.styleIdx]; },
+            ARP_PATTERN: [1, 2, 3, 4, 3, 2],
+
+            init() {
+                if (this.ctx) return;
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                this.ctx = ctx;
+
+                this.master = ctx.createGain();
+                this.master.gain.value = 0.9;
+                const comp = ctx.createDynamicsCompressor();
+                this.master.connect(comp);
+                comp.connect(ctx.destination);
+
+                this.bgmGain = ctx.createGain();
+                this.bgmGain.gain.value = 0.34;
+                this.bgmGain.connect(this.master);
+
+                this.sfxGain = ctx.createGain();
+                this.sfxGain.gain.value = 0.9;
+                this.sfxGain.connect(this.master);
+
+                // Pad 共用低通滤波器（音色随"宇宙能量"开合）
+                this.padFilter = ctx.createBiquadFilter();
+                this.padFilter.type = 'lowpass';
+                this.padFilter.frequency.value = 750;
+                this.padFilter.Q.value = 0.7;
+                this.padFilter.connect(this.bgmGain);
+
+                // 噪声源缓存
+                const len = ctx.sampleRate * 2;
+                this.noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
+                const data = this.noiseBuf.getChannelData(0);
+                for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+
+                this.startBGM();
+            },
+
+            // ---------- BGM 调度 ----------
+            startBGM() {
+                const t = this.ctx.currentTime;
+                this.nextChordTime = t + 0.15;
+                this.nextArpTime = t + 0.15;
+                this.timer = setInterval(() => this.tick(), 90);
+            },
+
+            tick() {
+                const ctx = this.ctx;
+                const st = this.style();
+                const spb = 60 / st.bpm; // 每拍秒数
+                const now = ctx.currentTime;
+                // 和弦
+                while (this.nextChordTime < now + 0.45) {
+                    const chord = st.chords[this.chordIdx % st.chords.length];
+                    this.playPad(chord, this.nextChordTime, spb * st.chordBeats);
+                    this.chordQueue.push({ time: this.nextChordTime, chord });
+                    this.chordIdx++;
+                    this.nextChordTime += spb * st.chordBeats;
+                }
+                // 琶音（八分音符）
+                if (st.arp) {
+                    while (this.nextArpTime < now + 0.45) {
+                        this.playArp(this.currentChordAt(this.nextArpTime), this.nextArpTime);
+                        this.nextArpTime += spb / 2;
+                    }
+                } else {
+                    this.nextArpTime = Math.max(this.nextArpTime, now + 0.45);
+                }
+            },
+
+            currentChordAt(t) {
+                let item = this.chordQueue[0];
+                for (const it of this.chordQueue) {
+                    if (it.time <= t) item = it; else break;
+                }
+                while (this.chordQueue.length > 1 && this.chordQueue[1].time <= t) this.chordQueue.shift();
+                return item ? item.chord : this.style().chords[0];
+            },
+
+            playPad(chord, t, dur) {
+                const ctx = this.ctx;
+                const st = this.style();
+                const g = ctx.createGain();
+                g.gain.setValueAtTime(0.0001, t);
+                g.gain.linearRampToValueAtTime(st.padGain, t + 1.8);     // 慢起音，管风琴呼吸感
+                g.gain.setValueAtTime(st.padGain, t + dur - 2.2);
+                g.gain.linearRampToValueAtTime(0.0001, t + dur);
+                g.connect(this.padFilter);
+
+                chord.notes.forEach(f => {
+                    for (const det of [-6, 6]) {                          // 双振荡器失谐 → 厚度
+                        const o = ctx.createOscillator();
+                        o.type = st.padWave;
+                        o.frequency.value = f;
+                        o.detune.value = det;
+                        o.connect(g);
+                        o.start(t);
+                        o.stop(t + dur + 0.2);
+                    }
+                });
+
+                // 低音持续音 (Sub Bass)
+                const s = ctx.createOscillator();
+                s.type = 'sine';
+                s.frequency.value = chord.root / 2;
+                const sg = ctx.createGain();
+                sg.gain.setValueAtTime(0.0001, t);
+                sg.gain.linearRampToValueAtTime(0.22, t + 1.6);
+                sg.gain.linearRampToValueAtTime(0.0001, t + dur);
+                s.connect(sg);
+                sg.connect(this.bgmGain);
+                s.start(t);
+                s.stop(t + dur + 0.2);
+            },
+
+            playArp(chord, t) {
+                const st = this.style();
+                if (!st.arp) return;
+                const ctx = this.ctx;
+                const idx = this.ARP_PATTERN[this.arpStep % this.ARP_PATTERN.length];
+                this.arpStep++;
+                this.panFlip *= -1;
+
+                const o = ctx.createOscillator();
+                o.type = st.arpWave;
+                o.frequency.value = chord.notes[idx] * 2;
+
+                const g = ctx.createGain();
+                g.gain.setValueAtTime(0.0001, t);
+                g.gain.linearRampToValueAtTime(st.arpGain, t + 0.012);
+                g.gain.exponentialRampToValueAtTime(0.0001, t + 0.42);
+
+                const p = ctx.createStereoPanner();
+                p.pan.value = 0.3 * this.panFlip;
+
+                o.connect(g); g.connect(p); p.connect(this.bgmGain);
+                o.start(t); o.stop(t + 0.5);
+            },
+
+            // 切换 BGM 风格：淡出 → 重置调度 → 淡入
+            setStyle(i) {
+                this.styleIdx = ((i % BGM_STYLES.length) + BGM_STYLES.length) % BGM_STYLES.length;
+                if (!this.ctx) return this.style().name;
+                const t = this.ctx.currentTime;
+                this.bgmGain.gain.cancelScheduledValues(t);
+                this.bgmGain.gain.setTargetAtTime(0.0001, t, 0.12);
+                clearInterval(this.timer);
+                this.timer = null;
+                this.chordQueue = [];
+                this.chordIdx = 0;
+                this.arpStep = 0;
+                setTimeout(() => {
+                    if (!this.ctx) return;
+                    const t2 = this.ctx.currentTime;
+                    this.nextChordTime = t2 + 0.1;
+                    this.nextArpTime = t2 + 0.1;
+                    this.timer = setInterval(() => this.tick(), 90);
+                    this.bgmGain.gain.setTargetAtTime(0.34, t2 + 0.2, 0.4);
+                }, 500);
+                return this.style().name;
+            },
+
+            setVibe(v) { // 双手膨胀/能量 → 音乐亮度
+                if (!this.padFilter) return;
+                this.padFilter.frequency.setTargetAtTime(this.style().filterBase + v * 2200, this.ctx.currentTime, 0.25);
+            },
+
+            throttle(name, ms) {
+                const now = performance.now();
+                if (this.lastSfx[name] && now - this.lastSfx[name] < ms) return false;
+                this.lastSfx[name] = now;
+                return true;
+            },
+
+            // ---------- 音效 ----------
+            blip(freq = 600) {
+                if (!this.ctx) return;
+                const ctx = this.ctx, t = ctx.currentTime;
+                const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = freq;
+                const g = ctx.createGain();
+                g.gain.setValueAtTime(0.1, t);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+                o.connect(g); g.connect(this.sfxGain);
+                o.start(t); o.stop(t + 0.1);
+            },
+
+            zoomOut() { // ✊ 低沉俯冲
+                if (!this.throttle('zoomOut', 700)) return;
+                const ctx = this.ctx, t = ctx.currentTime;
+                const o = ctx.createOscillator(); o.type = 'sine';
+                o.frequency.setValueAtTime(140, t);
+                o.frequency.exponentialRampToValueAtTime(36, t + 0.7);
+                const g = ctx.createGain();
+                g.gain.setValueAtTime(0.45, t);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
+                o.connect(g); g.connect(this.sfxGain);
+                o.start(t); o.stop(t + 0.85);
+
+                const n = ctx.createBufferSource(); n.buffer = this.noiseBuf;
+                const f = ctx.createBiquadFilter(); f.type = 'lowpass';
+                f.frequency.setValueAtTime(320, t);
+                f.frequency.exponentialRampToValueAtTime(60, t + 0.7);
+                const ng = ctx.createGain();
+                ng.gain.setValueAtTime(0.3, t);
+                ng.gain.exponentialRampToValueAtTime(0.001, t + 0.75);
+                n.connect(f); f.connect(ng); ng.connect(this.sfxGain);
+                n.start(t); n.stop(t + 0.8);
+            },
+
+            zoomIn() { // ✋ 上升闪烁
+                if (!this.throttle('zoomIn', 700)) return;
+                const ctx = this.ctx, t = ctx.currentTime;
+                [660, 880, 1320].forEach((f, i) => {
+                    const st = t + i * 0.07;
+                    const o = ctx.createOscillator(); o.type = 'sine';
+                    o.frequency.setValueAtTime(f, st);
+                    o.frequency.exponentialRampToValueAtTime(f * 1.6, st + 0.45);
+                    const g = ctx.createGain();
+                    g.gain.setValueAtTime(0.0001, st);
+                    g.gain.linearRampToValueAtTime(0.16, st + 0.02);
+                    g.gain.exponentialRampToValueAtTime(0.001, st + 0.5);
+                    o.connect(g); g.connect(this.sfxGain);
+                    o.start(st); o.stop(st + 0.55);
+                });
+                const n = ctx.createBufferSource(); n.buffer = this.noiseBuf;
+                const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 6500;
+                const g = ctx.createGain();
+                g.gain.setValueAtTime(0.05, t);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+                n.connect(f); f.connect(g); g.connect(this.sfxGain);
+                n.start(t); n.stop(t + 0.5);
+            },
+
+            supernova() { // ✌️ 爆发
+                if (!this.throttle('supernova', 800)) return;
+                const ctx = this.ctx, t = ctx.currentTime;
+                const n = ctx.createBufferSource(); n.buffer = this.noiseBuf;
+                const f = ctx.createBiquadFilter(); f.type = 'lowpass';
+                f.frequency.setValueAtTime(2600, t);
+                f.frequency.exponentialRampToValueAtTime(80, t + 0.9);
+                const g = ctx.createGain();
+                g.gain.setValueAtTime(0.75, t);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 1.0);
+                n.connect(f); f.connect(g); g.connect(this.sfxGain);
+                n.start(t); n.stop(t + 1.1);
+
+                [55, 110, 165].forEach(fr => {
+                    const o = ctx.createOscillator(); o.type = 'sawtooth';
+                    o.frequency.value = fr;
+                    o.detune.value = Math.random() * 10 - 5;
+                    const og = ctx.createGain();
+                    og.gain.setValueAtTime(0.22, t);
+                    og.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+                    o.connect(og); og.connect(this.sfxGain);
+                    o.start(t); o.stop(t + 0.65);
+                });
+
+                for (let i = 0; i < 6; i++) { // 星火尾音
+                    const st = t + 0.15 + i * 0.09;
+                    const o = ctx.createOscillator(); o.type = 'sine';
+                    o.frequency.value = 1200 + Math.random() * 2200;
+                    const og = ctx.createGain();
+                    og.gain.setValueAtTime(0.0001, st);
+                    og.gain.linearRampToValueAtTime(0.07, st + 0.01);
+                    og.gain.exponentialRampToValueAtTime(0.001, st + 0.5);
+                    o.connect(og); og.connect(this.sfxGain);
+                    o.start(st); o.stop(st + 0.55);
+                }
+            },
+
+            warp() { // 👍 曲率飞行
+                if (!this.throttle('warp', 800)) return;
+                const ctx = this.ctx, t = ctx.currentTime;
+                const n = ctx.createBufferSource(); n.buffer = this.noiseBuf; n.loop = true;
+                const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.2;
+                f.frequency.setValueAtTime(180, t);
+                f.frequency.exponentialRampToValueAtTime(3200, t + 0.5);
+                f.frequency.exponentialRampToValueAtTime(250, t + 1.1);
+                const g = ctx.createGain();
+                g.gain.setValueAtTime(0.001, t);
+                g.gain.exponentialRampToValueAtTime(0.35, t + 0.4);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 1.15);
+                n.connect(f); f.connect(g); g.connect(this.sfxGain);
+                n.start(t); n.stop(t + 1.2);
+
+                const o = ctx.createOscillator(); o.type = 'sine';
+                o.frequency.setValueAtTime(220, t);
+                o.frequency.exponentialRampToValueAtTime(880, t + 0.9);
+                const og = ctx.createGain();
+                og.gain.setValueAtTime(0.001, t);
+                og.gain.linearRampToValueAtTime(0.1, t + 0.5);
+                og.gain.exponentialRampToValueAtTime(0.001, t + 1.0);
+                o.connect(og); og.connect(this.sfxGain);
+                o.start(t); o.stop(t + 1.05);
+            },
+
+            ping(freq = 760) { // 🤏 水晶引力
+                if (!this.ctx) return;
+                const ctx = this.ctx, t = ctx.currentTime;
+                [[1, 0.22], [2, 0.09]].forEach(([mul, amp]) => {
+                    const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = freq * mul;
+                    const g = ctx.createGain();
+                    g.gain.setValueAtTime(amp, t);
+                    g.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+                    o.connect(g); g.connect(this.sfxGain);
+                    o.start(t); o.stop(t + 0.45);
+                });
+            },
+
+            zap() { // ☝️ 流星召唤
+                if (!this.throttle('zap', 300)) return;
+                const ctx = this.ctx, t = ctx.currentTime;
+                const o = ctx.createOscillator(); o.type = 'square';
+                o.frequency.setValueAtTime(950, t);
+                o.frequency.exponentialRampToValueAtTime(160, t + 0.12);
+                const g = ctx.createGain();
+                g.gain.setValueAtTime(0.11, t);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+                o.connect(g); g.connect(this.sfxGain);
+                o.start(t); o.stop(t + 0.15);
+            },
+
+            swellOn() { // 🙌 双手：太空轰鸣持续音
+                if (!this.ctx || this.droneOscs) return;
+                const ctx = this.ctx, t = ctx.currentTime;
+                const g = ctx.createGain(); g.gain.value = 0;
+                const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 700;
+                f.connect(g); g.connect(this.master);
+                const o1 = ctx.createOscillator(); o1.type = 'sawtooth'; o1.frequency.value = 110; o1.detune.value = -4;
+                const o2 = ctx.createOscillator(); o2.type = 'sawtooth'; o2.frequency.value = 165; o2.detune.value = 4;
+                o1.connect(f); o2.connect(f);
+                o1.start(t); o2.start(t);
+                this.droneOscs = [o1, o2];
+                this.droneGain = g;
+                this.droneFilter = f;
+            },
+
+            swellUpdate(v) {
+                if (!this.droneGain) return;
+                const t = this.ctx.currentTime;
+                this.droneGain.gain.setTargetAtTime(v * 0.2, t, 0.15);
+                this.droneFilter.frequency.setTargetAtTime(400 + v * 1600, t, 0.2);
+            },
+
+            swellOff() {
+                if (!this.droneOscs) return;
+                const t = this.ctx.currentTime;
+                this.droneGain.gain.setTargetAtTime(0, t, 0.25);
+                const oscs = this.droneOscs;
+                setTimeout(() => oscs.forEach(o => { try { o.stop(); } catch (e) {} }), 1200);
+                this.droneOscs = null;
+                this.droneGain = null;
+                this.droneFilter = null;
+            },
+
+            toggle() {
+                if (!this.ctx) return;
+                this.enabled = !this.enabled;
+                this.master.gain.setTargetAtTime(this.enabled ? 0.9 : 0, this.ctx.currentTime, 0.05);
+                return this.enabled;
+            }
+        };
+
+        // ==========================================
+        // 2. 配色方案 (👍 点赞切换)
+        // ==========================================
+        const PALETTES = [
+            { name: '烈焰橙', planetA: '#ff7733', planetB: '#ffcc66', ringA: '#7fd8ff', ringB: '#ff9944', ringC: '#ffffff', nebula: ['#6644ff', '#ff66aa', '#4488ff'] },
+            { name: '冰蓝紫', planetA: '#66ccff', planetB: '#aa99ff', ringA: '#88ffee', ringB: '#aa88ff', ringC: '#ffffff', nebula: ['#3355ff', '#aa44ff', '#4488cc'] },
+            { name: '翡翠绿', planetA: '#44ffaa', planetB: '#ccff88', ringA: '#66ffee', ringB: '#44aaff', ringC: '#ffffcc', nebula: ['#22cc88', '#4488ff', '#88ffcc'] },
+            { name: '玫红星云', planetA: '#ff4488', planetB: '#ffaa66', ringA: '#ff88cc', ringB: '#ffaa44', ringC: '#ffffff', nebula: ['#ff3366', '#8844ff', '#ff8844'] }
+        ];
+
+        const paletteState = {
+            idx: 0,
+            cur: { planetA: new THREE.Color(), planetB: new THREE.Color(), ringA: new THREE.Color(), ringB: new THREE.Color(), ringC: new THREE.Color() },
+            tgt: { planetA: new THREE.Color(), planetB: new THREE.Color(), ringA: new THREE.Color(), ringB: new THREE.Color(), ringC: new THREE.Color() },
+            nebulaTgt: [new THREE.Color(), new THREE.Color(), new THREE.Color()]
+        };
+
+        function applyPalette(i, instant = false) {
+            paletteState.idx = ((i % PALETTES.length) + PALETTES.length) % PALETTES.length;
+            const p = PALETTES[paletteState.idx];
+            paletteState.tgt.planetA.set(p.planetA);
+            paletteState.tgt.planetB.set(p.planetB);
+            paletteState.tgt.ringA.set(p.ringA);
+            paletteState.tgt.ringB.set(p.ringB);
+            paletteState.tgt.ringC.set(p.ringC);
+            p.nebula.forEach((c, j) => paletteState.nebulaTgt[j].set(c));
+            if (instant) {
+                for (const k in paletteState.cur) paletteState.cur[k].copy(paletteState.tgt[k]);
+            }
+            return PALETTES[paletteState.idx].name;
+        }
+
+        // ==========================================
+        // 3. Three.js 场景
+        // ==========================================
+        function initThree() {
+            const container = document.getElementById('canvas-container');
+
+            scene = new THREE.Scene();
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 4000);
+            camera.position.set(0, 0, CONFIG.defaultDistance);
+
+            renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // 降低填充率开销，Bloom 更流畅
+            renderer.setClearColor(0x000008);
+            container.appendChild(renderer.domElement);
+
+            // 后期处理 (Bloom)
+            const renderScene = new RenderPass(scene, camera);
+            bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.3, 0.6, 0.15);
+            composer = new EffectComposer(renderer);
+            composer.addPass(renderScene);
+            composer.addPass(bloomPass);
+
+            planetGroup = new THREE.Group();
+            scene.add(planetGroup);
+
+            buildPlanet();
+            buildRings();
+            buildStarfield();
+            buildNebulas();
+
+            window.addEventListener('resize', onWindowResize);
+            initMouseFallback();
+        }
+
+        // --- 粒子星球：自定义 Shader，流动/呼吸/闪烁 ---
+        function buildPlanet() {
+            const geo = new THREE.BufferGeometry();
+            const pos = [], sizes = [], phases = [], mixes = [];
+
+            for (let i = 0; i < CONFIG.particleCount; i++) {
+                const u = Math.random();
+                const v = Math.random();
+                const theta = 2 * Math.PI * u;
+                const phi = Math.acos(2 * v - 1);
+                let r = 50;
+                if (Math.random() > 0.8) r = 50 * Math.random(); // 少量内部填充
+                pos.push(
+                    r * Math.sin(phi) * Math.cos(theta),
+                    r * Math.sin(phi) * Math.sin(theta),
+                    r * Math.cos(phi)
+                );
+                sizes.push(Math.random() * 2 + 1);
+                phases.push(Math.random());
+                mixes.push(Math.random());
+            }
+
+            geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+            geo.setAttribute('aSize', new THREE.Float32BufferAttribute(sizes, 1));
+            geo.setAttribute('aPhase', new THREE.Float32BufferAttribute(phases, 1));
+            geo.setAttribute('aMix', new THREE.Float32BufferAttribute(mixes, 1));
+
+            planetMat = new THREE.ShaderMaterial({
+                transparent: true,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending,
+                uniforms: {
+                    uTime: { value: 0 },
+                    uEnergy: { value: 0 },
+                    uGravity: { value: 0 },
+                    uAttractor: { value: attractor },
+                    uColA: { value: paletteState.cur.planetA },
+                    uColB: { value: paletteState.cur.planetB }
+                },
+                vertexShader: `
+                    attribute float aSize;
+                    attribute float aPhase;
+                    attribute float aMix;
+                    uniform float uTime;
+                    uniform float uEnergy;
+                    uniform float uGravity;
+                    uniform vec3 uAttractor;
+                    varying float vMix;
+                    varying float vTw;
+                    void main() {
+                        vMix = aMix;
+                        vec3 p = position;
+                        // 呼吸起伏
+                        p *= 1.0 + 0.045 * sin(uTime * 1.5 + aPhase * 6.2831);
+                        // 缓慢旋涡流动（不同粒子不同角速度）
+                        float ang = uTime * (0.04 + 0.1 * aMix) + aPhase * 1.5;
+                        float s = sin(ang), c = cos(ang);
+                        p = vec3(c * p.x + s * p.z, p.y, -s * p.x + c * p.z);
+                        // 引力奇点 🤏
+                        vec3 toA = uAttractor - p;
+                        float d = length(toA);
+                        float pull = uGravity * smoothstep(180.0, 0.0, d);
+                        p += normalize(toA + vec3(0.0001)) * pull * 70.0;
+                        // 能量脉冲外扩
+                        p *= 1.0 + uEnergy * 0.18 * sin(aPhase * 6.2831 + uTime * 9.0);
+
+                        vec4 mv = modelViewMatrix * vec4(p, 1.0);
+                        gl_PointSize = aSize * (1.0 + uEnergy * 0.9) * (280.0 / -mv.z);
+                        vTw = 0.5 + 0.5 * sin(uTime * 2.6 + aPhase * 40.0);
+                        gl_Position = projectionMatrix * mv;
+                    }
+                `,
+                fragmentShader: `
+                    uniform vec3 uColA;
+                    uniform vec3 uColB;
+                    uniform float uEnergy;
+                    varying float vMix;
+                    varying float vTw;
+                    void main() {
+                        float d = length(gl_PointCoord - 0.5);
+                        float a = pow(smoothstep(0.5, 0.0, d), 1.4);
+                        vec3 col = mix(uColA, uColB, vMix);
+                        col += uEnergy * 0.6;
+                        gl_FragColor = vec4(col, a * (0.45 + 0.55 * vTw));
+                    }
+                `
+            });
+
+            planetSystem = new THREE.Points(geo, planetMat);
+            planetGroup.add(planetSystem);
+        }
+
+        // --- 星环：开普勒式旋转（内圈快外圈慢）+ 波浪起伏 + 流动色带 ---
+        function buildRings() {
+            const makeRing = (rInner, rOuter, count, tiltX, tiltZ) => {
+                const geo = new THREE.BufferGeometry();
+                const pos = [], sizes = [], phases = [], rads = [];
+                for (let i = 0; i < count; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const rr = THREE.MathUtils.lerp(rInner, rOuter, Math.random());
+                    pos.push(rr * Math.cos(angle), (Math.random() - 0.5) * 2, rr * Math.sin(angle));
+                    sizes.push(Math.random() * 1.8 + 0.9);
+                    phases.push(Math.random());
+                    rads.push((rr - rInner) / (rOuter - rInner));
+                }
+                geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+                geo.setAttribute('aSize', new THREE.Float32BufferAttribute(sizes, 1));
+                geo.setAttribute('aPhase', new THREE.Float32BufferAttribute(phases, 1));
+                geo.setAttribute('aRad', new THREE.Float32BufferAttribute(rads, 1));
+
+                const mat = new THREE.ShaderMaterial({
+                    transparent: true,
+                    depthWrite: false,
+                    blending: THREE.AdditiveBlending,
+                    uniforms: {
+                        uTime: { value: 0 },
+                        uEnergy: { value: 0 },
+                        uColA: { value: paletteState.cur.ringA },
+                        uColB: { value: paletteState.cur.ringB },
+                        uColC: { value: paletteState.cur.ringC }
+                    },
+                    vertexShader: `
+                        attribute float aSize;
+                        attribute float aPhase;
+                        attribute float aRad;
+                        uniform float uTime;
+                        uniform float uEnergy;
+                        varying float vRad;
+                        varying float vTw;
+                        void main() {
+                            vRad = aRad;
+                            vec3 p = position;
+                            // 开普勒旋转：内圈快，外圈慢
+                            float ang = uTime * (0.1 + 0.4 * (1.0 - aRad)) + aPhase * 0.3;
+                            float s = sin(ang), c = cos(ang);
+                            p = vec3(c * p.x + s * p.z, p.y, -s * p.x + c * p.z);
+                            // 波浪起伏
+                            p.y += sin(uTime * 1.2 + length(p.xz) * 0.08 + aPhase * 6.2831) * 2.5;
+                            p *= 1.0 + uEnergy * 0.12;
+
+                            vec4 mv = modelViewMatrix * vec4(p, 1.0);
+                            gl_PointSize = aSize * (240.0 / -mv.z);
+                            vTw = 0.5 + 0.5 * sin(uTime * 3.0 + aPhase * 50.0);
+                            gl_Position = projectionMatrix * mv;
+                        }
+                    `,
+                    fragmentShader: `
+                        uniform vec3 uColA;
+                        uniform vec3 uColB;
+                        uniform vec3 uColC;
+                        uniform float uTime;
+                        uniform float uEnergy;
+                        varying float vRad;
+                        varying float vTw;
+                        void main() {
+                            float d = length(gl_PointCoord - 0.5);
+                            float a = smoothstep(0.5, 0.05, d);
+                            vec3 col = mix(uColA, uColB, vRad);
+                            // 沿环流动的亮色带
+                            float band = 0.5 + 0.5 * sin(vRad * 30.0 - uTime * 2.2);
+                            col = mix(col, uColC, band * 0.35 + uEnergy * 0.5);
+                            gl_FragColor = vec4(col, a * (0.35 + 0.5 * vTw));
+                        }
+                    `
+                });
+                const sys = new THREE.Points(geo, mat);
+                sys.rotation.x = tiltX;
+                sys.rotation.z = tiltZ;
+                return sys;
+            };
+
+            ringSystem1 = makeRing(70, 110, CONFIG.ringParticleCount, Math.PI / 3, Math.PI / 6);
+            ringSystem2 = makeRing(80, 140, CONFIG.ringParticleCount, -Math.PI / 4, -Math.PI / 8);
+            ringMat1 = ringSystem1.material;
+            ringMat2 = ringSystem2.material;
+            planetGroup.add(ringSystem1);
+            planetGroup.add(ringSystem2);
+        }
+
+        // --- 背景星空：闪烁粒子 ---
+        function buildStarfield() {
+            const geo = new THREE.BufferGeometry();
+            const pos = [], sizes = [], phases = [], mixes = [];
+            for (let i = 0; i < 2600; i++) {
+                const r = 900 + Math.random() * 600;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
+                pos.push(
+                    r * Math.sin(phi) * Math.cos(theta),
+                    r * Math.sin(phi) * Math.sin(theta),
+                    r * Math.cos(phi)
+                );
+                sizes.push(Math.random() * 1.8 + 0.8);
+                phases.push(Math.random());
+                mixes.push(Math.random());
+            }
+            geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+            geo.setAttribute('aSize', new THREE.Float32BufferAttribute(sizes, 1));
+            geo.setAttribute('aPhase', new THREE.Float32BufferAttribute(phases, 1));
+            geo.setAttribute('aMix', new THREE.Float32BufferAttribute(mixes, 1));
+
+            starMat = new THREE.ShaderMaterial({
+                transparent: true,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending,
+                uniforms: { uTime: { value: 0 } },
+                vertexShader: `
+                    attribute float aSize;
+                    attribute float aPhase;
+                    attribute float aMix;
+                    uniform float uTime;
+                    varying float vA;
+                    varying float vMix;
+                    void main() {
+                        vMix = aMix;
+                        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+                        gl_PointSize = aSize * (760.0 / -mv.z);
+                        vA = 0.3 + 0.7 * (0.5 + 0.5 * sin(uTime * (0.6 + aMix * 2.2) + aPhase * 100.0));
+                        gl_Position = projectionMatrix * mv;
+                    }
+                `,
+                fragmentShader: `
+                    varying float vA;
+                    varying float vMix;
+                    void main() {
+                        float d = length(gl_PointCoord - 0.5);
+                        float a = smoothstep(0.5, 0.0, d);
+                        vec3 col = mix(vec3(1.0, 0.85, 0.7), vec3(0.7, 0.85, 1.0), vMix);
+                        gl_FragColor = vec4(mix(col, vec3(1.0), 0.4), a * vA);
+                    }
+                `
+            });
+
+            starfield = new THREE.Points(geo, starMat);
+            scene.add(starfield);
+        }
+
+        // --- 星云：加色混合的大型云雾 Sprite ---
+        function makeNebulaTexture() {
+            const c = document.createElement('canvas');
+            c.width = c.height = 256;
+            const x = c.getContext('2d');
+            x.fillStyle = '#000';
+            x.fillRect(0, 0, 256, 256);
+            for (let i = 0; i < 38; i++) {
+                const px = 40 + Math.random() * 176;
+                const py = 40 + Math.random() * 176;
+                const r = 20 + Math.random() * 70;
+                const g = x.createRadialGradient(px, py, 0, px, py, r);
+                const a = 0.04 + Math.random() * 0.1;
+                g.addColorStop(0, 'rgba(255,255,255,' + a + ')');
+                g.addColorStop(1, 'rgba(255,255,255,0)');
+                x.fillStyle = g;
+                x.beginPath();
+                x.arc(px, py, r, 0, 6.29);
+                x.fill();
+            }
+            const g2 = x.createRadialGradient(128, 128, 0, 128, 128, 115);
+            g2.addColorStop(0, 'rgba(255,255,255,0.16)');
+            g2.addColorStop(1, 'rgba(255,255,255,0)');
+            x.fillStyle = g2;
+            x.fillRect(0, 0, 256, 256);
+            return new THREE.CanvasTexture(c);
+        }
+
+        function buildNebulas() {
+            const texA = makeNebulaTexture();
+            const texB = makeNebulaTexture();
+            for (let i = 0; i < 9; i++) {
+                const mat = new THREE.SpriteMaterial({
+                    map: i % 2 ? texA : texB,
+                    transparent: true,
+                    opacity: 0.28 + Math.random() * 0.2,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false,
+                    rotation: Math.random() * Math.PI * 2,
+                    color: new THREE.Color()
+                });
+                const sp = new THREE.Sprite(mat);
+                const r = 450 + Math.random() * 450;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
+                sp.position.set(
+                    r * Math.sin(phi) * Math.cos(theta),
+                    r * Math.sin(phi) * Math.sin(theta) * 0.6,
+                    r * Math.cos(phi)
+                );
+                const s = 350 + Math.random() * 420;
+                sp.scale.set(s, s, 1);
+                sp.userData.spin = (Math.random() - 0.5) * 0.02;
+                sp.userData.colorIdx = i % 3;
+                scene.add(sp);
+                nebulaSprites.push(sp);
+            }
+        }
+
+        // --- 彗星 / 流星 ---
+        function makeCometTexture() {
+            const c = document.createElement('canvas');
+            c.width = 128; c.height = 32;
+            const x = c.getContext('2d');
+            const g = x.createLinearGradient(0, 0, 128, 0);
+            g.addColorStop(0, 'rgba(255,255,255,0)');
+            g.addColorStop(0.7, 'rgba(170,215,255,0.35)');
+            g.addColorStop(0.95, 'rgba(255,255,255,0.9)');
+            g.addColorStop(1, 'rgba(255,255,255,1)');
+            x.fillStyle = g;
+            x.fillRect(0, 12, 128, 8);
+            const rg = x.createRadialGradient(120, 16, 0, 120, 16, 11);
+            rg.addColorStop(0, 'rgba(255,255,255,1)');
+            rg.addColorStop(1, 'rgba(255,255,255,0)');
+            x.fillStyle = rg;
+            x.fillRect(106, 2, 26, 28);
+            return new THREE.CanvasTexture(c);
+        }
+        const cometTexture = makeCometTexture();
+        const _camV = new THREE.Vector3();
+
+        function spawnComet(origin, dir) {
+            if (comets.length >= 8) return;
+            const mat = new THREE.SpriteMaterial({
+                map: cometTexture,
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                opacity: 0,
+                rotation: 0
+            });
+            const sp = new THREE.Sprite(mat);
+            const vel = dir.clone().normalize().multiplyScalar(130 + Math.random() * 110);
+            sp.position.copy(origin);
+            sp.scale.set(110 + Math.random() * 90, 5 + Math.random() * 4, 1);
+            scene.add(sp);
+            comets.push({ sp, vel, life: 0, maxLife: 2.2 + Math.random() * 1.6 });
+        }
+
+        function spawnAmbientComet() {
+            const r = 450 + Math.random() * 300;
+            const theta = Math.random() * Math.PI * 2;
+            const origin = new THREE.Vector3(r * Math.cos(theta), (Math.random() - 0.5) * 300, r * Math.sin(theta));
+            const target = new THREE.Vector3((Math.random() - 0.5) * 200, (Math.random() - 0.5) * 200, (Math.random() - 0.5) * 200);
+            spawnComet(origin, target.sub(origin));
+        }
+
+        function updateComets(dt) {
+            for (let i = comets.length - 1; i >= 0; i--) {
+                const c = comets[i];
+                c.life += dt;
+                c.sp.position.addScaledVector(c.vel, dt);
+                const t = Math.min(c.life / c.maxLife, 1);
+                c.sp.material.opacity = Math.sin(Math.PI * t) * 0.9;
+                // 让拖尾朝向运动方向（屏幕空间角度）
+                _camV.copy(c.vel).transformDirection(camera.matrixWorldInverse);
+                c.sp.material.rotation = Math.atan2(_camV.y, _camV.x);
+                if (c.life >= c.maxLife) {
+                    scene.remove(c.sp);
+                    c.sp.material.dispose();
+                    comets.splice(i, 1);
+                }
+            }
+        }
+
+        // --- 超新星爆发（一次性粒子云） ---
+        function spawnBurst() {
+            const N = 600;
+            const geo = new THREE.BufferGeometry();
+            const zeros = new Float32Array(N * 3);
+            const dirs = new Float32Array(N * 3);
+            const speeds = new Float32Array(N);
+            const sizes = new Float32Array(N);
+            for (let i = 0; i < N; i++) {
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
+                dirs[i * 3] = Math.sin(phi) * Math.cos(theta);
+                dirs[i * 3 + 1] = Math.sin(phi) * Math.sin(theta);
+                dirs[i * 3 + 2] = Math.cos(phi);
+                speeds[i] = 1.0 + Math.random() * 3.2;
+                sizes[i] = 1.5 + Math.random() * 2.5;
+            }
+            geo.setAttribute('position', new THREE.BufferAttribute(zeros, 3));
+            geo.setAttribute('aDir', new THREE.BufferAttribute(dirs, 3));
+            geo.setAttribute('aSpeed', new THREE.BufferAttribute(speeds, 1));
+            geo.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+
+            const mat = new THREE.ShaderMaterial({
+                transparent: true,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending,
+                uniforms: {
+                    uProgress: { value: 0 },
+                    uColor: { value: paletteState.cur.planetB.clone() }
+                },
+                vertexShader: `
+                    attribute vec3 aDir;
+                    attribute float aSpeed;
+                    attribute float aSize;
+                    uniform float uProgress;
+                    varying float vFade;
+                    void main() {
+                        float t = clamp(uProgress, 0.0, 1.0);
+                        float e = 1.0 - pow(1.0 - t, 3.0);
+                        vec3 p = aDir * aSpeed * e * 60.0;
+                        vec4 mv = modelViewMatrix * vec4(p, 1.0);
+                        gl_PointSize = aSize * (1.0 - t * 0.8) * (300.0 / -mv.z);
+                        vFade = 1.0 - t;
+                        gl_Position = projectionMatrix * mv;
+                    }
+                `,
+                fragmentShader: `
+                    uniform vec3 uColor;
+                    varying float vFade;
+                    void main() {
+                        float d = length(gl_PointCoord - 0.5);
+                        float a = smoothstep(0.5, 0.0, d);
+                        gl_FragColor = vec4(uColor + 0.4, a * vFade);
+                    }
+                `
+            });
+            const pts = new THREE.Points(geo, mat);
+            scene.add(pts);
+            bursts.push({ pts, mat, t: 0 });
+        }
+
+        function updateBursts(dt) {
+            for (let i = bursts.length - 1; i >= 0; i--) {
+                const b = bursts[i];
+                b.t += dt;
+                b.mat.uniforms.uProgress.value = b.t / 1.8;
+                if (b.t > 1.9) {
+                    scene.remove(b.pts);
+                    b.pts.geometry.dispose();
+                    b.mat.dispose();
+                    bursts.splice(i, 1);
+                }
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // --- 鼠标后备操作（无摄像头也能玩） ---
+        function initMouseFallback() {
+            let dragging = false, lastX = 0, lastY = 0;
+            const el = renderer.domElement;
+            el.addEventListener('pointerdown', e => { dragging = true; lastX = e.clientX; lastY = e.clientY; });
+            window.addEventListener('pointerup', () => dragging = false);
+            window.addEventListener('pointermove', e => {
+                if (!dragging) return;
+                cameraState.phi -= (e.clientX - lastX) * 0.005;
+                cameraState.theta = THREE.MathUtils.clamp(cameraState.theta - (e.clientY - lastY) * 0.005, 0.4, 2.7);
+                lastX = e.clientX; lastY = e.clientY;
+            });
+            el.addEventListener('wheel', e => {
+                cameraState.radius = THREE.MathUtils.clamp(cameraState.radius + e.deltaY * 0.4, CONFIG.minDistance, 1600);
+            }, { passive: true });
+        }
+
+        // ==========================================
+        // 4. 相机更新
+        // ==========================================
+        function updateCamera(dt) {
+            // 平滑后的旋转量 + 软死区：消除边界突跳
+            const r = cameraState.handRotation;
+            const dz = CONFIG.rotationDeadzone;
+            let mag = 0;
+            if (Math.abs(r) > dz) mag = Math.min(Math.abs(r) - dz, 1.2) * Math.sign(r);
+            cameraState.phi += mag * CONFIG.rotationSpeed * dt;
+
+            if (cameraState.isFist) {
+                cameraState.zoomVelocity += 30 * dt;
+            } else if (cameraState.isOpen) {
+                const diff = cameraState.radius - CONFIG.minDistance;
+                cameraState.zoomVelocity = -diff * 3.0 * dt;
+            } else {
+                cameraState.zoomVelocity *= Math.exp(-6.3 * dt);
+            }
+
+            cameraState.radius += cameraState.zoomVelocity;
+            if (cameraState.radius < CONFIG.minDistance) {
+                cameraState.radius = CONFIG.minDistance;
+                cameraState.zoomVelocity = 0;
+            }
+            if (cameraState.radius > 1800) cameraState.radius = 1800;
+
+            // 无操作时缓慢自动巡航（帧率无关）
+            if (!cameraState.isFist && !cameraState.isOpen && mag === 0) {
+                cameraState.phi -= CONFIG.cruiseSpeed * dt;
+            }
+
+            camera.position.x = cameraState.radius * Math.sin(cameraState.theta) * Math.sin(cameraState.phi);
+            camera.position.y = cameraState.radius * Math.cos(cameraState.theta);
+            camera.position.z = cameraState.radius * Math.sin(cameraState.theta) * Math.cos(cameraState.phi);
+            camera.lookAt(0, 0, 0);
+        }
+
+        // ==========================================
+        // 5. 主循环
+        // ==========================================
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = Math.min(clock.getDelta(), 0.05);
+            const t = clock.elapsedTime;
+
+            // 手部旋转平滑：MediaPipe ~30fps 的目标值 → 渲染帧率插值，消除旋转卡顿
+            cameraState.handRotation += (cameraState.handRotationTarget - cameraState.handRotation) * Math.min(1, dt * 12);
+
+            // 能量衰减
+            energy = Math.max(0, energy - dt * 0.55);
+            fovBoost = Math.max(0, fovBoost - dt * 1.2);
+
+            // 双手膨胀平滑
+            expansion += (expansionTarget - expansion) * Math.min(1, dt * 4);
+            planetGroup.scale.setScalar(0.8 + expansion * 0.55);
+
+            // 引力平滑
+            gravityStrength += (gravityTarget - gravityStrength) * Math.min(1, dt * 5);
+            attractor.lerp(attractorTarget, Math.min(1, dt * 8));
+
+            // Shader uniforms
+            planetMat.uniforms.uTime.value = t;
+            planetMat.uniforms.uEnergy.value = energy;
+            planetMat.uniforms.uGravity.value = gravityStrength;
+            ringMat1.uniforms.uTime.value = t;
+            ringMat1.uniforms.uEnergy.value = energy;
+            ringMat2.uniforms.uTime.value = t + 7.3;
+            ringMat2.uniforms.uEnergy.value = energy;
+            starMat.uniforms.uTime.value = t;
+
+            // 配色渐变
+            const lerpK = Math.min(1, dt * 1.8);
+            for (const k in paletteState.cur) paletteState.cur[k].lerp(paletteState.tgt[k], lerpK);
+            nebulaSprites.forEach(sp => {
+                sp.material.rotation += sp.userData.spin * dt;
+                sp.material.color.lerp(paletteState.nebulaTgt[sp.userData.colorIdx], lerpK * 0.5);
+            });
+
+            // 星空缓旋
+            starfield.rotation.y += dt * 0.004;
+
+            // 彗星 & 爆发 & 环境流星
+            updateComets(dt);
+            updateBursts(dt);
+            nextAmbientComet -= dt;
+            if (nextAmbientComet <= 0) {
+                spawnAmbientComet();
+                nextAmbientComet = 5 + Math.random() * 7;
+            }
+
+            // 音频联动
+            if (gestureState.twoHand) AudioEngine.swellUpdate(expansion);
+            if (AudioEngine.ctx) {
+                const vibe = Math.max(expansion, energy * 0.6);
+                const lastVibe = AudioEngine._lastVibe ?? -1;
+                if (Math.abs(vibe - lastVibe) > 0.03) {
+                    AudioEngine.setVibe(vibe);
+                    AudioEngine._lastVibe = vibe;
+                }
+            }
+
+            // Bloom 与 FOV 联动
+            bloomPass.strength = 1.3 + energy * 1.5;
+            const targetFov = 60 + fovBoost * 14;
+            if (Math.abs(camera.fov - targetFov) > 0.01) {
+                camera.fov = targetFov;
+                camera.updateProjectionMatrix();
+            }
+
+            updateCamera(dt);
+            composer.render();
+        }
+
+        // ==========================================
+        // 6. 手势识别（双手）
+        // ==========================================
+        const gestureState = {
+            hands: {},        // label -> 上次手势
+            pinchActive: false,
+            twoHand: false,
+            lastPing: 0,
+            pingN: 0,
+            pointLast: 0,
+            rawRot: undefined // 旋转量指数平滑缓存
+        };
+        let firstResult = false;
+
+        const GDESC = {
+            fist: '✊ 拉远', open: '✋ 靠近', peace: '✌️ 超新星',
+            thumb: '👍 换配色', pinch: '🤏 引力奇点', point: '☝️ 流星', idle: '🖐 旋转'
+        };
+        const GBLIP = { fist: 300, open: 900, peace: 1200, thumb: 700, idle: 600 };
+
+        const previewCanvas = document.getElementById('webcam-preview');
+        const previewCtx = previewCanvas.getContext('2d');
+        previewCanvas.width = 160;
+        previewCanvas.height = 120;
+        const raycaster = new THREE.Raycaster();
+        const _plane = new THREE.Plane();
+        const _ndc = new THREE.Vector3();
+        const _hit = new THREE.Vector3();
+
+        // 将归一化手部坐标投到"过原点、面向相机"的平面上
+        function worldFromLandmark(lm) {
+            _ndc.set((1 - lm.x) * 2 - 1, -(lm.y * 2 - 1), 0.5);
+            raycaster.setFromCamera(_ndc, camera);
+            _plane.normal.copy(camera.position).normalize();
+            _plane.constant = 0;
+            if (raycaster.ray.intersectPlane(_plane, _hit)) return _hit.clone();
+            return raycaster.ray.at(cameraState.radius, new THREE.Vector3());
+        }
+
+        // 单手手势分类
+        function analyzeHand(lm) {
+            const d = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+            const wrist = lm[0];
+            const handSize = Math.max(d(wrist, lm[9]), 0.001);
+            const tips = [8, 12, 16, 20], mcps = [5, 9, 13, 17];
+            let folded = 0;
+            const ext = [];
+            for (let i = 0; i < 4; i++) {
+                const e = d(lm[tips[i]], wrist) > d(lm[mcps[i]], wrist) * 1.18;
+                ext.push(e);
+                if (!e) folded++;
+            }
+            const thumbExt = d(lm[4], lm[17]) > handSize * 1.15;
+            const pinchDist = d(lm[4], lm[8]) / handSize;
+
+            if (folded >= 3 && !thumbExt) return 'fist';
+            if (pinchDist < 0.4 && folded <= 2) return 'pinch';
+            if (ext[0] && ext[1] && !ext[2] && !ext[3]) return 'peace';
+            if (ext[0] && !ext[1] && !ext[2] && !ext[3]) return 'point';
+            if (folded >= 3 && thumbExt && lm[4].y < lm[0].y - 0.06) return 'thumb';
+            if (folded === 0) return 'open';
+            return 'idle';
+        }
+
+        // 手势切换时触发的动作 + 音效
+        function onGestureAction(g) {
+            switch (g) {
+                case 'fist':
+                    AudioEngine.zoomOut();
+                    break;
+                case 'open':
+                    AudioEngine.zoomIn();
+                    break;
+                case 'peace':
+                    AudioEngine.supernova();
+                    spawnBurst();
+                    energy = 1;
+                    break;
+                case 'thumb': {
+                    AudioEngine.warp();
+                    fovBoost = 1;
+                    const name = applyPalette(paletteState.idx + 1);
+                    statusEl.dataset.palette = name;
+                    break;
+                }
+                case 'idle':
+                    AudioEngine.blip(GBLIP.idle);
+                    break;
+            }
+        }
+
+        function onResults(results) {
+            if (!firstResult) {
+                firstResult = true;
+                showToast('✅ 手势识别已就绪，举起双手试试');
+            }
+            // 绘制预览
+            previewCtx.save();
+            previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+            previewCtx.drawImage(results.image, 0, 0, previewCanvas.width, previewCanvas.height);
+
+            const lms = results.multiHandLandmarks || [];
+            const handed = results.multiHandedness || [];
+            const infos = [];
+
+            for (let i = 0; i < lms.length; i++) {
+                const lm = lms[i];
+                drawConnectors(previewCtx, lm, HAND_CONNECTIONS, { color: '#00FFCC', lineWidth: 2 });
+                drawLandmarks(previewCtx, lm, { color: '#FF6644', lineWidth: 1, radius: 2 });
+                infos.push({
+                    label: (handed[i] && handed[i].label) || ('手' + (i + 1)),
+                    lm,
+                    gesture: analyzeHand(lm)
+                });
+            }
+
+            const now = performance.now();
+
+            // ---- 双手模式：双手放松（张开/半张）时，间距控制宇宙膨胀 ----
+            const bothRelaxed = infos.length === 2 &&
+                infos.every(x => x.gesture === 'idle' || x.gesture === 'open');
+
+            if (bothRelaxed) {
+                if (!gestureState.twoHand) {
+                    gestureState.twoHand = true;
+                    AudioEngine.swellOn();
+                }
+                const c1 = infos[0].lm[9], c2 = infos[1].lm[9];
+                const dist = Math.hypot(c1.x - c2.x, c1.y - c2.y);
+                expansionTarget = THREE.MathUtils.clamp((dist - 0.12) / 0.6, 0, 1);
+                cameraState.isFist = false;
+                cameraState.isOpen = false;
+                gestureState.rawRot = undefined;
+                cameraState.handRotationTarget = 0;
+                statusEl.innerText = '🙌 双手 · 宇宙膨胀 ' + Math.round(expansionTarget * 100) + '%';
+                statusEl.style.color = '#ffaa66';
+            } else {
+                if (gestureState.twoHand) {
+                    gestureState.twoHand = false;
+                    expansionTarget = 0;
+                    AudioEngine.swellOff();
+                }
+
+                // ---- 单手控制 ----
+                cameraState.isFist = infos.some(x => x.gesture === 'fist');
+                cameraState.isOpen = !cameraState.isFist && infos.some(x => x.gesture === 'open');
+                if (infos.length > 0) {
+                    const wrist = infos[0].lm[0], mid = infos[0].lm[9];
+                    const raw = (mid.x - wrist.x) * -5.0;
+                    // 指数平滑滤除 30fps 采样抖动，渲染循环再做插值
+                    gestureState.rawRot = gestureState.rawRot === undefined
+                        ? raw
+                        : gestureState.rawRot + (raw - gestureState.rawRot) * 0.35;
+                    cameraState.handRotationTarget = gestureState.rawRot;
+                } else {
+                    gestureState.rawRot = undefined;
+                    cameraState.handRotationTarget = 0;
+                }
+
+                // ---- 手势变化 → 动作/音效 ----
+                for (const info of infos) {
+                    const prev = gestureState.hands[info.label];
+                    if (prev !== undefined && prev !== info.gesture) {
+                        onGestureAction(info.gesture);
+                    }
+                    gestureState.hands[info.label] = info.gesture;
+                }
+
+                // ---- 🤏 引力奇点 ----
+                const pinchHand = infos.find(x => x.gesture === 'pinch');
+                if (pinchHand) {
+                    if (!gestureState.pinchActive) {
+                        gestureState.pinchActive = true;
+                        gestureState.pingN = 0;
+                        AudioEngine.ping(760);
+                    }
+                    gravityTarget = 1;
+                    const mid = { x: (pinchHand.lm[4].x + pinchHand.lm[8].x) / 2, y: (pinchHand.lm[4].y + pinchHand.lm[8].y) / 2 };
+                    attractorTarget.copy(worldFromLandmark(mid)).multiplyScalar(1 / planetGroup.scale.x);
+                    if (now - gestureState.lastPing > 600) { // 引力回升音
+                        AudioEngine.ping(700 * Math.pow(1.1, gestureState.pingN));
+                        gestureState.pingN = Math.min(gestureState.pingN + 1, 14);
+                        gestureState.lastPing = now;
+                    }
+                } else if (gestureState.pinchActive) {
+                    gestureState.pinchActive = false;
+                    gravityTarget = 0;
+                    AudioEngine.blip(420);
+                }
+
+                // ---- ☝️ 流星召唤 ----
+                const pointHand = infos.find(x => x.gesture === 'point');
+                if (pointHand && now - gestureState.pointLast > 320) {
+                    const origin = worldFromLandmark(pointHand.lm[8]);
+                    const dir = origin.clone().sub(camera.position);
+                    dir.x += (Math.random() - 0.5) * 80;
+                    dir.y += (Math.random() - 0.5) * 80;
+                    spawnComet(origin, dir);
+                    AudioEngine.zap();
+                    gestureState.pointLast = now;
+                }
+
+                // ---- 状态文本 ----
+                if (infos.length === 0) {
+                    statusEl.innerText = '未检测到手';
+                    statusEl.style.color = '#888';
+                } else {
+                    statusEl.innerText = infos
+                        .map(x => (x.label === 'Left' ? '左手' : x.label === 'Right' ? '右手' : x.label) + ' ' + (GDESC[x.gesture] || x.gesture))
+                        .join('  |  ') + (statusEl.dataset.palette ? '  ·  ' + statusEl.dataset.palette : '');
+                    statusEl.style.color = '#00ffcc';
+                }
+            }
+            previewCtx.restore();
+        }
+
+        // --- MediaPipe 动态加载：国内镜像优先，失败自动回退国际源 ---
+        const MP_PKGS = [
+            ['@mediapipe/camera_utils', '0.3.1675466862', 'camera_utils.js'],
+            ['@mediapipe/drawing_utils', '0.3.1675466124', 'drawing_utils.js'],
+            ['@mediapipe/hands', '0.4.1675469240', 'hands.js']
+        ];
+        const MP_HANDS_VER = '0.4.1675469240';
+        const MEDIAPIPE_SOURCES = [
+            {
+                label: '国内镜像源',
+                // MediaPipe hands.js 内部请求的 file 形如 "hands_solution_packed_assets_loader.js" / "hands_solution_simd_wasm_bin.js"
+                url: (pkg, ver, file) => `https://registry.npmmirror.com/${pkg}/${ver}/files/${file}`,
+                handsBase: `https://registry.npmmirror.com/@mediapipe/hands/${MP_HANDS_VER}/files`
+            },
+            {
+                label: '国际源',
+                url: (pkg, ver, file) => `https://cdn.jsdelivr.net/npm/${pkg}@${ver}/${file}`,
+                handsBase: `https://cdn.jsdelivr.net/npm/@mediapipe/hands@${MP_HANDS_VER}/files`
+            }
+        ];
+        let mpHandsBase = MEDIAPIPE_SOURCES[1].handsBase;
+        let mpSourceUsed = MEDIAPIPE_SOURCES[1];
+
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                // 加时间戳：MediaPipe 缓存会导致内部 locateFile/wasm 路径永远用旧版本
+                s.src = src + (src.includes('?') ? '&' : '?') + 'v=' + (Math.floor(Date.now() / 60000));
+                s.onload = resolve;
+                s.onerror = () => reject(new Error('加载失败: ' + src));
+                document.head.appendChild(s);
+            });
+        }
+
+        async function loadMediaPipe(onMsg) {
+            // 重试时：强制重新下载 hands 并重建 Hands 对象（避免缓存的 hands.js 内部 locateFile 错误）
+            window.Hands = undefined;
+            window.Camera = undefined;
+            window.drawConnectors = undefined;
+            window.drawLandmarks = undefined;
+            let lastErr = '';
+            for (const src of MEDIAPIPE_SOURCES) {
+                try {
+                    onMsg(`正在从${src.label}加载手势 AI 模型（约几 MB，首次稍慢）...`);
+                    for (const [pkg, ver, file] of MP_PKGS) {
+                        await loadScript(src.url(pkg, ver, file));
+                    }
+                    mpHandsBase = src.handsBase;
+                    mpSourceUsed = src;
+                    return;
+                } catch (e) {
+                    lastErr = e.message;
+                    console.warn(e.message);
+                }
+            }
+            throw new Error('手势 AI 模型加载失败（' + lastErr + '），请检查网络后刷新重试');
+        }
+
+        async function initMediaPipe() {
+            try {
+                await loadMediaPipe(msg => {
+                    loadingEl.style.display = 'block';
+                    loadingEl.innerHTML = msg + '<br><span style="font-size:12px">若浏览器弹出摄像头询问，请选择「允许」</span>';
+                });
+
+                const videoElement = document.getElementById('input-video');
+                // locateFile: hands.js 内部直接传文件名（已经包含 hands/ 前缀），不要重复拼接路径
+                const hands = new window.Hands({
+                    locateFile: file => `${mpHandsBase}/${file}`
+                });
+
+                hands.setOptions({
+                    maxNumHands: 2,
+                    modelComplexity: 0,          // 轻量模型：推理更快，主线程卡顿更少
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.6
+                });
+
+                hands.onResults(onResults);
+
+                // 防积压：上一帧推理没结束就跳过本帧，避免帧队列堆积造成的滞后与顿挫
+                let processing = false, sendErrCount = 0, errDisplayed = false;
+                const cameraUtils = new window.Camera(videoElement, {
+                    onFrame: async () => {
+                        if (processing) return;
+                        processing = true;
+                        try {
+                            await hands.send({ image: videoElement });
+                            sendErrCount = 0;
+                        } catch (e) {
+                            // 仅首次失败时显示错误，避免反复覆盖成功状态
+                            if (++sendErrCount >= 5 && !errDisplayed) {
+                                errDisplayed = true;
+                                statusEl.innerText = '⚠️ AI 推理异常 — 请检查模型加载/摄像头，然后刷新重试';
+                                statusEl.style.color = '#ff6666';
+                                console.error('MediaPipe send error:', e);
+                            }
+                        } finally {
+                            processing = false;
+                        }
+                    },
+                    width: 640,
+                    height: 480
+                });
+
+                loadingEl.innerHTML = '正在开启摄像头...<br><span style="font-size:12px">请在浏览器弹窗中选择「允许」</span>';
+                await cameraUtils.start();
+
+                // 摄像头已开，进入场景；首帧识别到达前给出提示
+                document.getElementById('start-overlay').style.display = 'none';
+                statusEl.innerText = '摄像头已就绪，手势 AI 首帧加载中...';
+                statusEl.style.color = '#ffdd66';
+
+                // 看门狗：20 秒仍无识别结果 → 给出诊断
+                setTimeout(() => {
+                    if (!firstResult) {
+                        statusEl.innerText = '⚠️ 手势识别未启动（摄像头权限/占用/网络）';
+                        statusEl.style.color = '#ff6666';
+                        showToast('排查：1.地址栏锁图标→摄像头设为允许 2.关闭占用摄像头的软件 3.刷新重试', 8000);
+                    }
+                }, 20000);
+            } catch (err) {
+                // 按错误类型给出可操作的中文修复指引
+                const name = err && err.name ? err.name : '';
+                const GUIDE = {
+                    NotAllowedError: '摄像头权限被拒绝 → 点地址栏左侧「锁/摄像头」图标 → 网站设置 → 摄像头改为「允许」→ 点重试',
+                    PermissionDeniedError: '摄像头权限被拒绝 → 点地址栏左侧「锁/摄像头」图标 → 网站设置 → 摄像头改为「允许」→ 点重试',
+                    NotReadableError: '摄像头被其他程序占用 → 完全退出腾讯会议/钉钉/QQ/微信/OBS 后点重试',
+                    TrackStartError: '摄像头被其他程序占用 → 完全退出腾讯会议/钉钉/QQ/微信/OBS 后点重试',
+                    NotFoundError: '未检测到摄像头 → 检查物理开关/Fn 快捷键，或到设备管理器查看驱动',
+                    DevicesNotFoundError: '未检测到摄像头 → 检查物理开关/Fn 快捷键，或到设备管理器查看驱动',
+                    SecurityError: '安全限制 → 必须通过 localhost 或 https 访问，不能直接双击 html 文件打开'
+                };
+                const guide = GUIDE[name] || '';
+                loadingEl.innerHTML = '<span style="color:#ff8888">❌ ' + (err.message || err) + '</span>'
+                    + (guide ? '<br><span style="color:#ffd27f;font-size:13px">💡 ' + guide + '</span>' : '')
+                    + '<br><span style="font-size:12px;opacity:0.7">也可以点下方「跳过手势」先观赏场景与音乐</span>';
+                const btn = document.getElementById('btn-start');
+                btn.style.display = '';
+                btn.textContent = '🔄 重试';
+                console.error(err);
+            }
+        }
+
+        // ==========================================
+        // 7. 启动
+        // ==========================================
+        initThree();
+        applyPalette(0, true);
+        animate();
+
+        // 开屏前预检摄像头权限：被拒过就直接亮提示，避免用户白等
+        if (navigator.permissions && navigator.permissions.query) {
+            navigator.permissions.query({ name: 'camera' }).then(res => {
+                if (res.state === 'denied') {
+                    document.getElementById('cam-denied-tip').style.display = 'block';
+                }
+            }).catch(() => {});
+        }
+
+        document.getElementById('btn-start').addEventListener('click', () => {
+            try { AudioEngine.init(); } catch (e) { console.warn('音频启动失败:', e); }
+            loadingEl.style.display = 'block';
+            document.getElementById('btn-start').style.display = 'none';
+            setTimeout(() => initMediaPipe(), 200);
+        });
+
+        // 跳过手势，仅观赏
+        document.getElementById('skip-entry').addEventListener('click', () => {
+            document.getElementById('start-overlay').style.display = 'none';
+            statusEl.innerText = '观赏模式：鼠标拖动旋转 / 滚轮缩放';
+        });
+
+        // BGM 风格切换
+        document.getElementById('btn-music').addEventListener('click', () => {
+            const name = AudioEngine.setStyle(AudioEngine.styleIdx + 1);
+            showToast('🎵 BGM · ' + name);
+        });
+
+        document.getElementById('btn-sound').addEventListener('click', function () {
+            if (!AudioEngine.ctx) { showToast('点击「开启星际之旅」后声音才可用'); return; }
+            const on = AudioEngine.toggle();
+            this.textContent = on ? '🔊' : '🔈';
+            this.classList.toggle('muted', !on);
+        });
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>NEON STRIKE — 霓虹突袭</title>
+<link rel="stylesheet" href="飞机大战/css/style.css?v=2" />
+</head>
+<body>
+  <div id="wrap">
+    <canvas id="game" width="480" height="720"></canvas>
+    <div id="hint">点击 / 按 任一键 开始</div>
+  </div>
+
+  <!-- 按依赖顺序加载：资源路径指向 飞机大战/ 子目录，?v=2 用于刷新缓存 -->
+  <script src="飞机大战/js/config.js?v=2"></script>
+  <script src="飞机大战/js/engine/events.js?v=2"></script>
+  <script src="飞机大战/js/engine/pool.js?v=2"></script>
+  <script src="飞机大战/js/engine/storage.js?v=2"></script>
+  <script src="飞机大战/js/engine/input.js?v=2"></script>
+  <script src="飞机大战/js/engine/audio.js?v=2"></script>
+  <script src="飞机大战/js/engine/renderer.js?v=2"></script>
+  <script src="飞机大战/js/engine/asset.js?v=2"></script>
+  <script src="飞机大战/js/data/weapons.js?v=2"></script>
+  <script src="飞机大战/js/data/passives.js?v=2"></script>
+  <script src="飞机大战/js/data/enemies.js?v=2"></script>
+  <script src="飞机大战/js/data/bosses.js?v=2"></script>
+  <script src="飞机大战/js/data/waves.js?v=2"></script>
+  <script src="飞机大战/js/data/upgrades.js?v=2"></script>
+  <script src="飞机大战/js/systems/difficulty.js?v=2"></script>
+  <script src="飞机大战/js/systems/collision.js?v=2"></script>
+  <script src="飞机大战/js/systems/bulletPattern.js?v=2"></script>
+  <script src="飞机大战/js/systems/dropper.js?v=2"></script>
+  <script src="飞机大战/js/systems/spawner.js?v=2"></script>
+  <script src="飞机大战/js/entities/Particle.js?v=2"></script>
+  <script src="飞机大战/js/entities/Bullet.js?v=2"></script>
+  <script src="飞机大战/js/entities/Gem.js?v=2"></script>
+  <script src="飞机大战/js/entities/Pickup.js?v=2"></script>
+  <script src="飞机大战/js/entities/Enemy.js?v=2"></script>
+  <script src="飞机大战/js/entities/Boss.js?v=2"></script>
+  <script src="飞机大战/js/entities/Player.js?v=2"></script>
+  <script src="飞机大战/js/ui/Scene.js?v=2"></script>
+  <script src="飞机大战/js/ui/MainMenu.js?v=2"></script>
+  <script src="飞机大战/js/ui/Hud.js?v=2"></script>
+  <script src="飞机大战/js/ui/UpgradePanel.js?v=2"></script>
+  <script src="飞机大战/js/ui/PauseMenu.js?v=2"></script>
+  <script src="飞机大战/js/ui/GameOver.js?v=2"></script>
+  <script src="飞机大战/js/engine/Game.js?v=2"></script>
+  <script src="飞机大战/js/main.js?v=2"></script>
+</body>
+</html>
